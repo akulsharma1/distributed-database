@@ -8,11 +8,15 @@ import (
 type Raft struct {
 	Mu sync.Mutex
 	
-	Peers []string
+	Peers []*Raft
 	Port string
 	Server *http.Server
+
 	State State
 	ID int
+
+	LeaderAddr string
+	LeaderID int
 
 	PersistentState struct {
 		CurrentTerm int // latest term server has seen
@@ -21,14 +25,14 @@ type Raft struct {
 	}
 	
 	VolatileState struct {
-		CommitIndex int
-		LastApplied int
+		CommitIndex int // index of highest log known to be committed
+		LastApplied int // index of highest log applied to state machine
 
 		LeaderVolatileState struct {
-
+			NextIndex map[int]int // index of the next log to send to each following server
+			MatchIndex map[int]int // index of highest log known to be replicated on following servers
 		}
 	}
-
 }
 
 type Log struct {
@@ -47,6 +51,8 @@ type AppendEntry struct {
 	PrevLogTerm int
 	Entries []Log
 	LeaderCommitIndex int
+
+	LeaderPort string
 }
 
 type AppendEntryResp struct {
