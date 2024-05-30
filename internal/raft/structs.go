@@ -8,20 +8,22 @@ import (
 type Raft struct {
 	Mu sync.Mutex
 	
-	Peers []*Raft
-	Port string
+	Peers []*Raft // a list of all peers - TODO: change
+	Port string // port for raft node server
 	Server *http.Server
 
-	State State
-	ID int
+	State State // current state of node (leader, candidate, or follower)
+	ID int // node ID
 
-	LeaderAddr string
-	LeaderID int
+	// LeaderAddr string
+	// LeaderID int
 
 	PersistentState struct {
 		CurrentTerm int // latest term server has seen
 		VotedFor int // candidateID they voted for, -1 if hasn't voted
 		Logs []Log // first index is 1
+
+		Database map[string]interface{} // database key/value store
 	}
 	
 	VolatileState struct {
@@ -36,7 +38,11 @@ type Raft struct {
 }
 
 type Log struct {
-	Data interface{}
+	Operation Operation
+
+	Key string
+	Value interface{}
+
 	Term int
 }
 

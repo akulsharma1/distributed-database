@@ -7,3 +7,12 @@ const (
 	CANDIDATE State = iota
 	LEADER State = iota
 )
+
+type Operation string
+
+const (
+	// GET Operation = "GET"
+	
+	PUT Operation = "PUT"
+	DELETE Operation = "DELETE"
+)
