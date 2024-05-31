@@ -43,6 +43,17 @@ func (r *Raft) StartServer() {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}()
+
+	go r.CheckIfElectionRequired()
+
+	go func() {
+		for {
+			StartElection := <-r.ElectionChan
+			if StartElection && r.State != CANDIDATE {
+				r.StartElection()
+			}
+		}
+	}()
 }
 
 func (r *Raft) HandleGet(w http.ResponseWriter, req *http.Request) {
