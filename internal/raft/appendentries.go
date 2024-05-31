@@ -70,7 +70,7 @@ func (r *Raft) CreateAndSendAppendEntry() {
 			r.VolatileState.LeaderVolatileState.NextIndex[follower.ID] = len(r.PersistentState.Logs) - 1
 			successCount++
 		}
-		
+
 		r.Mu.Unlock()
 
 		
@@ -83,6 +83,9 @@ func (r *Raft) CreateAndSendAppendEntry() {
 	}
 }
 
+/*
+Follower handling for appending entry RPC. Used in RPC Call.
+*/
 func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) {
 	r.Mu.Lock()
 	defer r.Mu.Unlock()
@@ -91,8 +94,8 @@ func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) {
 		return
 	}
 
-	// r.LeaderAddr = req.LeaderPort
-	// r.LeaderID = req.LeaderID
+	r.LeaderAddr = req.LeaderPort
+	r.LeaderID = req.LeaderID
 
 	log.Printf("[Node %v]: Received Append Entry Request/Heartbeat from Leader (Node %v)\n", r.ID, req.LeaderID)
 	
@@ -102,9 +105,10 @@ func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) {
 		resp.Success = false
 		resp.Term = r.PersistentState.CurrentTerm
 		return
+	} else if req.Term > r.PersistentState.CurrentTerm {
+		r.PersistentState.CurrentTerm = req.Term
+		r.State = FOLLOWER
 	}
-
-	
 
 	if req.PrevLogIndex > 0 {
 		if req.PrevLogIndex > len(r.PersistentState.Logs) || r.PersistentState.Logs[req.PrevLogIndex].Term != req.PrevLogTerm {
@@ -156,7 +160,8 @@ Database handler for logs which are appended.
 func (r *Raft) HandleLog(log Log) {
 	if log.Operation == PUT {
 		r.PersistentState.Database[log.Key] = log.Value
-	} else if log.Operation == DELETE {
-		delete(r.PersistentState.Database, log.Key)
-	}
+	} 
+	// else if log.Operation == DELETE {
+	// 	delete(r.PersistentState.Database, log.Key)
+	// }
 }
