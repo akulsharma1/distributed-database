@@ -3,6 +3,7 @@ package raft
 import (
 	"net/http"
 	"sync"
+	"time"
 )
 
 type Raft struct {
@@ -15,8 +16,12 @@ type Raft struct {
 	State State // current state of node (leader, candidate, or follower)
 	ID int // node ID
 
-	// LeaderAddr string
-	// LeaderID int
+	LeaderAddr string
+	LeaderID int
+
+	ElectionTimer *time.Duration // election timer (randomly assigned between 150-300ms)
+	LastHeartbeat *time.Time // last heartbeat/append entry rpc the node received
+	ElectionChan chan bool
 
 	PersistentState struct {
 		CurrentTerm int // latest term server has seen
@@ -47,7 +52,15 @@ type Log struct {
 }
 
 type RequestVote struct {
+	Term int
+	CandidateID int
+	LastLogIndex int // index of last log candidate has
+	LastLogTerm int // term of last log candidate has
+}
 
+type RequestVoteResp struct {
+	Term int // term of peer for updating
+	VoteGranted bool // whether vote was granted from peer
 }
 
 type AppendEntry struct {
