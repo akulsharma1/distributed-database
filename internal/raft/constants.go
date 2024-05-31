@@ -12,7 +12,7 @@ type Operation string
 
 const (
 	// GET Operation = "GET"
-	
+
 	PUT Operation = "PUT"
-	DELETE Operation = "DELETE"
+	// DELETE Operation = "DELETE"
 )
