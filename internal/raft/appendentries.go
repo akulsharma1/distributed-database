@@ -3,7 +3,6 @@ package raft
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/ybbus/jsonrpc/v3"
 )
@@ -24,7 +23,7 @@ func (r *Raft) CreateAndSendAppendEntry() {
 			continue
 		}
 
-		log.Printf("[Node %v]: Sending Append Entry to follower Node %v at port %v\n", r.ID, follower.ID, follower.Port)
+		r.Printf(fmt.Sprintf("Sending Append Entry to follower Node %v at port %v\n", follower.ID, follower.Address))
 
 		r.Mu.Lock()
 
@@ -40,7 +39,7 @@ func (r *Raft) CreateAndSendAppendEntry() {
 
 		r.Mu.Unlock()
 
-		rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://localhost:%v/rpc", follower.Port))
+		rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://localhost:%v/rpc", follower.Address))
 		resp, err := rpcClient.Call(context.Background(), "Raft.AppendEntryFollower", appendEntry)
 
 		if (err != nil) {
@@ -97,7 +96,7 @@ func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) {
 	r.LeaderAddr = req.LeaderPort
 	r.LeaderID = req.LeaderID
 
-	log.Printf("[Node %v]: Received Append Entry Request/Heartbeat from Leader (Node %v)\n", r.ID, req.LeaderID)
+	r.Printf(fmt.Sprintf("Received Append Entry Request/Heartbeat from Leader (Node %v)\n", req.LeaderID))
 	
 	resp.ReplyNodeID = r.ID
 
