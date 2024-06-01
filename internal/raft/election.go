@@ -15,6 +15,7 @@ func (r *Raft) CheckIfElectionRequired() {
 		r.Mu.Unlock()
 
 		if timeDiff > *r.ElectionTimer {
+			r.Printf("Found time since last heartbeat > election timer. Sending message to start election.")
 			r.ElectionChan <- true
 		}
 	}
@@ -24,6 +25,7 @@ func (r *Raft) StartElection() {
 	if r.State == CANDIDATE || r.State == LEADER {
 		return
 	}
+	r.Printf("Starting election.")
 
 	r.Mu.Lock()
 
@@ -41,6 +43,8 @@ func (r *Raft) StartElection() {
 		if peer.ID == r.ID {
 			continue
 		}
+		r.Printf(fmt.Sprintf("Sending vote request to peer %v", peer.ID))
+
 		r.Mu.Lock()
 
 		voteRequest := &RequestVote{
@@ -52,7 +56,7 @@ func (r *Raft) StartElection() {
 
 		r.Mu.Unlock()
 
-		rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://localhost:%v/rpc", peer.Port))
+		rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://localhost:%v/rpc", peer.Address))
 		resp, err := rpcClient.Call(context.Background(), "Raft.VoteRequestReply", voteRequest)
 
 		if (err != nil) {
@@ -89,7 +93,33 @@ func (r *Raft) StartElection() {
 		return
 	}
 
+	r.Printf(fmt.Sprintf("Received %v total votes out of %v total peers during candidacy", numOfVotes, len(r.Peers)))
 	if numOfVotes > len(r.Peers) / 2 {
 		r.State = LEADER
 	}
+}
+
+func (r *Raft) VoteRequestReply(req RequestVote, resp *RequestVoteResp) {
+	r.Mu.Lock()
+	defer r.Mu.Unlock()
+
+	resp.Term = r.PersistentState.CurrentTerm
+
+	if req.Term < r.PersistentState.CurrentTerm {
+		r.Printf("Received vote request. Voting no, invalid term.")
+		resp.VoteGranted = false
+		return
+	}
+
+	if req.LastLogIndex >= len(r.PersistentState.Logs) - 1 && req.LastLogTerm >= r.PersistentState.Logs[len(r.PersistentState.Logs) - 1].Term {
+		if r.PersistentState.VotedFor == -1 {
+			r.Printf("Received vote request. Voting yes.")
+			resp.VoteGranted = true
+			r.PersistentState.VotedFor = req.CandidateID
+		}
+	}
+
+	r.Printf("Received vote request. Voting no.")
+
+	resp.VoteGranted = false
 }
