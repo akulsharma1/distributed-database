@@ -9,7 +9,7 @@ import (
 type Raft struct {
 	Mu sync.Mutex
 	
-	Peers []*Raft // a list of all peers - TODO: change
+	Peers []*Peer // a list of all peers - TODO: change
 	Port string // port for raft node server
 	Server *http.Server
 
@@ -23,23 +23,28 @@ type Raft struct {
 	LastHeartbeat *time.Time // last heartbeat/append entry rpc the node received
 	ElectionChan chan bool
 
-	PersistentState struct {
-		CurrentTerm int // latest term server has seen
-		VotedFor int // candidateID they voted for, -1 if hasn't voted
-		Logs []Log // first index is 1
+	PersistentState PersistentState
+	VolatileState VolatileState
+}
 
-		Database map[string]interface{} // database key/value store
-	}
-	
-	VolatileState struct {
-		CommitIndex int // index of highest log known to be committed
-		LastApplied int // index of highest log applied to state machine
+type PersistentState struct {
+	CurrentTerm int // latest term server has seen
+	VotedFor int // candidateID they voted for, -1 if hasn't voted
+	Logs []Log // first index is 1
 
-		LeaderVolatileState struct {
-			NextIndex map[int]int // index of the next log to send to each following server
-			MatchIndex map[int]int // index of highest log known to be replicated on following servers
-		}
-	}
+	Database map[string]interface{} // database key/value store
+}
+
+type VolatileState struct {
+	CommitIndex int // index of highest log known to be committed
+	LastApplied int // index of highest log applied to state machine
+
+	LeaderVolatileState LeaderVolatileState
+}
+
+type LeaderVolatileState struct {
+	NextIndex map[int]int // index of the next log to send to each following server
+	MatchIndex map[int]int // index of highest log known to be replicated on following servers
 }
 
 type Log struct {
@@ -78,4 +83,9 @@ type AppendEntryResp struct {
 	ReplyNodeID int // id of raft node sending reply
 	Term int // current term for leader to update itself
 	Success bool // true if follower contained entry matching PrevLogIndex and PrevLogTerm
+}
+
+type Peer struct {
+	ID int `json:"id"`
+	Address string `json:"address"`
 }
