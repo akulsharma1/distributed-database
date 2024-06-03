@@ -3,6 +3,7 @@
 An implementation of a key/value database in Golang. Uses the [Raft consensus algorithm](https://raft.github.io/) for server consensus.
 
 **How to start a node**
+
 `go run . --nodeID <node_id_here> --port <port here (e.g. localhost:5555)>`
 In order to run multiple nodes, open multiple terminals and run the same command with different NodeIDs and ports.
 
