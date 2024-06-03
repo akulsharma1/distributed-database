@@ -59,6 +59,16 @@ func main() {
 		},
 	}
 
+	err = registry.AddNode(&raft.Peer{
+		ID: r.ID,
+		Address: r.Port,
+	})
+
+	if err != nil {
+		fmt.Printf("Error adding node to registry: %v", err)
+		return
+	}
+
 	r.StartServer()
 }
 
