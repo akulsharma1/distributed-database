@@ -2,6 +2,7 @@ package raft
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -95,11 +96,12 @@ func (r *Raft) StartElection() {
 
 	r.Printf(fmt.Sprintf("Received %v total votes out of %v total peers during candidacy", numOfVotes, len(r.Peers)))
 	if numOfVotes > len(r.Peers) / 2 {
+		r.Printf("Becoming leader.")
 		r.State = LEADER
 	}
 }
 
-func (r *Raft) VoteRequestReply(req RequestVote, resp *RequestVoteResp) {
+func (r *Raft) VoteRequestReply(req RequestVote, resp *RequestVoteResp) error {
 	r.Mu.Lock()
 	defer r.Mu.Unlock()
 
@@ -108,7 +110,7 @@ func (r *Raft) VoteRequestReply(req RequestVote, resp *RequestVoteResp) {
 	if req.Term < r.PersistentState.CurrentTerm {
 		r.Printf("Received vote request. Voting no, invalid term.")
 		resp.VoteGranted = false
-		return
+		return errors.New("invalid term")
 	}
 
 	if req.LastLogIndex >= len(r.PersistentState.Logs) - 1 && req.LastLogTerm >= r.PersistentState.Logs[len(r.PersistentState.Logs) - 1].Term {
@@ -122,4 +124,5 @@ func (r *Raft) VoteRequestReply(req RequestVote, resp *RequestVoteResp) {
 	r.Printf("Received vote request. Voting no.")
 
 	resp.VoteGranted = false
+	return nil
 }
