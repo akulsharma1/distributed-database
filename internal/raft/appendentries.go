@@ -2,7 +2,9 @@ package raft
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ybbus/jsonrpc/v3"
 )
@@ -85,14 +87,16 @@ func (r *Raft) CreateAndSendAppendEntry() {
 /*
 Follower handling for appending entry RPC. Used in RPC Call.
 */
-func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) {
+func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) error {
 	r.Mu.Lock()
 	defer r.Mu.Unlock()
 
 	if (r.State == LEADER) {
-		return
+		return errors.New("is already leader")
 	}
 
+	*r.LastHeartbeat = time.Now()
+	
 	r.LeaderAddr = req.LeaderPort
 	r.LeaderID = req.LeaderID
 
@@ -103,7 +107,7 @@ func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) {
 	if req.Term < r.PersistentState.CurrentTerm {
 		resp.Success = false
 		resp.Term = r.PersistentState.CurrentTerm
-		return
+		return errors.New("leader term is less than current term")
 	} else if req.Term > r.PersistentState.CurrentTerm {
 		r.PersistentState.CurrentTerm = req.Term
 		r.State = FOLLOWER
@@ -114,7 +118,7 @@ func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) {
 			resp.Term = r.PersistentState.CurrentTerm
 			resp.Success = false
 			r.PersistentState.Logs = r.PersistentState.Logs[:req.PrevLogIndex]
-			return
+			return errors.New("invalid leader logs")
 		}
 	}
 
@@ -151,6 +155,8 @@ func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) {
 
 	resp.Term = r.PersistentState.CurrentTerm
 	resp.Success = true
+
+	return nil
 }
 
 /*
