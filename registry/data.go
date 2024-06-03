@@ -11,10 +11,10 @@ import (
 )
 
 func GetNodes() ([]*raft.Peer, error) {
-	file, err := os.Open("./nodes.json")
+	file, err := os.Open("./registry/nodes.json")
 	if err != nil {
 		log.Printf("Failed to open file: %v", err)
-		return []*raft.Peer{}, errors.New("error opening registry file")
+		return []*raft.Peer{}, errors.New("error opening registry file for read")
 	}
 	defer file.Close()
 
@@ -37,10 +37,10 @@ func GetNodes() ([]*raft.Peer, error) {
 }
 
 func AddNode(node *raft.Peer) error {
-	file, err := os.Open("./nodes.json")
+	file, err := os.Open("./registry/nodes.json")
 	if err != nil {
 		log.Printf("Failed to open file: %v", err)
-		return errors.New("error opening registry file")
+		return errors.New("error opening registry file for write")
 	}
 	defer file.Close()
 
@@ -59,21 +59,40 @@ func AddNode(node *raft.Peer) error {
 		return errors.New("error unmarshaling registry file to struct")
 	}
 
+	registryNodes := []*raft.Peer{}
+	for _, peer := range registry.Nodes {
+		if peer.Address == node.Address && peer.ID == node.ID {
+			return nil
+		}
+		if peer.Address == node.Address && peer.ID != node.ID || peer.ID == node.ID && peer.Address != node.Address {
+			continue
+		}
+		registryNodes = append(registryNodes, peer)
+	}
+
+	registry.Nodes = registryNodes
 	registry.Nodes = append(registry.Nodes, node)
 
-	updatedData, err := json.Marshal(registry)
+	updatedData, err := json.MarshalIndent(registry, "", "	")
 
 	if err != nil {
 		log.Printf("Failed to marshal JSON: %v", err)
 		return errors.New("error marshaling struct to json for registry file write")
 	}
 	
-	_, err = file.Write(updatedData)
+	file, err = os.Create("./registry/nodes.json")
+	if err != nil {
+		log.Printf("Failed to open file for writing: %v", err)
+		return errors.New("error opening registry file for write")
+	}
+	defer file.Close()
 
+	_, err = file.Write(updatedData)
 	if err != nil {
 		log.Printf("Failed to write to registry file: %v", err)
-		return errors.New("error writing to registry file")
+		return errors.New("error writing to registry head-fiEleg le")
 	}
+
 
 	return nil
 }
