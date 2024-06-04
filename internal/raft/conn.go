@@ -33,7 +33,7 @@ func (r *Raft) StartServer() {
 	mux.Handle(rpc.DefaultRPCPath, rpcServer)
 
 	mux.HandleFunc("/get", r.HandleGet)
-	mux.HandleFunc("/set", r.HandleGet)
+	mux.HandleFunc("/set", r.HandleSet)
 
 	r.Printf(fmt.Sprintf("Starting server at %v", r.Port))
 	var wg sync.WaitGroup
@@ -72,17 +72,50 @@ func (r *Raft) StartServer() {
 }
 
 func (r *Raft) HandleGet(w http.ResponseWriter, req *http.Request) {
+
 	key := req.URL.Query().Get("key")
 
-	fmt.Println(key)
 	if r.State != LEADER {
 		// TODO: forward request. for now we will just return "not leader"
-		http.Error(w, "Not Leader", http.StatusBadRequest)
+		resp := &HttpServerResponse{
+			Success: false,
+			Message: "Not Leader",
+		}
+		
+		data, _ := json.Marshal(resp)
+
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(data)
+
 		return
 	}
 
+	val, ok := r.PersistentState.Database[key]
+
+	if !ok {
+		resp := &HttpServerResponse{
+			Success: false,
+			Message: "Data not found",
+		}
+
+		data, _ := json.Marshal(resp)
+
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(data)
+
+		return
+	}
+	
+	resp := &HttpServerResponse{
+		Success: true,
+		Message: "Found Data",
+		Value: val,
+	}
+
+	data, _ := json.Marshal(resp)
+
 	w.WriteHeader(http.StatusOK)
-	w.Write(r.PersistentState.Database[key].([]byte))
+	w.Write(data)
 }
 
 func (r *Raft) HandleSet(w http.ResponseWriter, req *http.Request) {
@@ -91,7 +124,16 @@ func (r *Raft) HandleSet(w http.ResponseWriter, req *http.Request) {
 
 	if r.State != LEADER {
 		// TODO: forward request. for now we will just return "not leader"
-		http.Error(w, "Not Leader", http.StatusBadRequest)
+		resp := &HttpServerResponse{
+			Success: false,
+			Message: "Not Leader",
+		}
+		
+		data, _ := json.Marshal(resp)
+
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(data)
+
 		return
 	}
 
@@ -121,6 +163,13 @@ func (r *Raft) HandleSet(w http.ResponseWriter, req *http.Request) {
 
 	r.PersistentState.Database[logEntry.Key] = logEntry.Value
 
+	resp := &HttpServerResponse{
+		Success: true,
+		Message: "Set key/value pair",
+	}
+
+	data, _ := json.Marshal(resp)
+
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Success"))
+	w.Write(data)
 }

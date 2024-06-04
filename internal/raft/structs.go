@@ -89,3 +89,9 @@ type Peer struct {
 	ID int `json:"id"`
 	Address string `json:"address"`
 }
+
+type HttpServerResponse struct {
+	Success bool `json:"success"`
+	Message string `json:"message"`
+	Value interface{} `json:"value"`
+}
