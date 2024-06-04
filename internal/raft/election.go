@@ -11,6 +11,9 @@ import (
 
 func (r *Raft) CheckIfElectionRequired() {
 	for {
+		if r.State == LEADER {
+			continue
+		}
 		r.Mu.Lock()
 		timeDiff := time.Since(*r.LastHeartbeat)
 		r.Mu.Unlock()
@@ -98,6 +101,14 @@ func (r *Raft) StartElection() {
 	if numOfVotes > len(r.Peers) / 2 {
 		r.Printf("Becoming leader.")
 		r.State = LEADER
+
+		for _, peer := range r.Peers {
+			if peer.ID == r.ID {
+				continue
+			}
+			r.VolatileState.LeaderVolatileState.NextIndex[peer.ID] = len(r.PersistentState.Logs) + 1
+			r.VolatileState.LeaderVolatileState.MatchIndex[peer.ID] = 0
+		}
 	}
 }
 
