@@ -12,7 +12,7 @@ import (
 
 var (
 	flagNodeID = flag.Int("nodeID", -1, "node id")
-	flagPort = flag.String("port", "", "port to start node")
+	flagAddr = flag.String("address", "", "port to start node")
 )
 
 func main() {
@@ -22,7 +22,7 @@ func main() {
 		fmt.Println("Invalid nodeID flag")
 		return
 	}
-	if *flagPort == "" {
+	if *flagAddr == "" {
 		fmt.Println("Invalid port flag")
 		return
 	}
@@ -37,7 +37,7 @@ func main() {
 
 	r := &raft.Raft{
 		Peers: peers,
-		Port: *flagPort,
+		Port: *flagAddr,
 		State: raft.FOLLOWER,
 		ID: *flagNodeID,
 		ElectionTimer: generateElectionTime(),
