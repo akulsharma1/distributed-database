@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"net/http"
+
 	"github.com/ybbus/jsonrpc/v3"
 )
 
@@ -29,7 +31,7 @@ func (r *Raft) StartElection() {
 	if r.State == CANDIDATE || r.State == LEADER {
 		return
 	}
-	r.Printf("Starting election.")
+	// r.Printf("------Starting election.-------")
 
 	r.Mu.Lock()
 
@@ -47,47 +49,65 @@ func (r *Raft) StartElection() {
 		if peer.ID == r.ID {
 			continue
 		}
-		r.Printf(fmt.Sprintf("Sending vote request to peer %v", peer.ID))
 
-		r.Mu.Lock()
+		go func(peer *Peer) {
+			r.Printf(fmt.Sprintf("Sending vote request to peer %v", peer.ID))
 
-		voteRequest := &RequestVote{
-			Term: r.PersistentState.CurrentTerm,
-			CandidateID: r.ID,
-			LastLogIndex: len(r.PersistentState.Logs) - 1,
-			LastLogTerm: r.PersistentState.Logs[len(r.PersistentState.Logs) - 1].Term,
-		}
+			r.Mu.Lock()
 
-		r.Mu.Unlock()
-
-		rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://localhost:%v/rpc", peer.Address))
-		resp, err := rpcClient.Call(context.Background(), "Raft.VoteRequestReply", voteRequest)
-
-		if (err != nil) {
-			continue
-		}
-
-		var voteRequestReply RequestVoteResp
-		err = resp.GetObject(&voteRequestReply)
-
-		if err != nil {
-			continue
-		}
-
-		r.Mu.Lock()
-		if voteRequestReply.Term > r.PersistentState.CurrentTerm {
-			r.State = FOLLOWER
-			r.PersistentState.CurrentTerm = voteRequest.Term
+			var voteRequest *RequestVote
+			if len(r.PersistentState.Logs) == 0 {
+				voteRequest = &RequestVote{
+					Term: r.PersistentState.CurrentTerm,
+					CandidateID: r.ID,
+					LastLogIndex: 0,
+					LastLogTerm: 0,
+				}
+			} else {
+				voteRequest = &RequestVote{
+					Term: r.PersistentState.CurrentTerm,
+					CandidateID: r.ID,
+					LastLogIndex: len(r.PersistentState.Logs) - 1,
+					LastLogTerm: r.PersistentState.Logs[len(r.PersistentState.Logs) - 1].Term,
+				}
+			}
+			
 
 			r.Mu.Unlock()
 
-			return
-		}
+			rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://%v/rpc", peer.Address))
+			resp, err := rpcClient.Call(context.Background(), "Raft.VoteRequestReply", &voteRequest)
 
-		if voteRequestReply.VoteGranted {
-			numOfVotes++
-		}
-		r.Mu.Unlock()
+			// log.Println("****VOTE REQUEST REPLY******")
+			// log.Println(resp, err)
+
+			if (err != nil) {
+				return
+			}
+
+			var voteRequestReply *RequestVoteResp
+			err = resp.GetObject(&voteRequestReply)
+
+			if err != nil {
+				return
+			}
+
+			r.Mu.Lock()
+			if voteRequestReply.Term > r.PersistentState.CurrentTerm {
+				r.State = FOLLOWER
+				r.PersistentState.CurrentTerm = voteRequest.Term
+
+				r.Mu.Unlock()
+
+				return
+			}
+
+			if voteRequestReply.VoteGranted {
+				r.Printf(fmt.Sprintf("Received vote from node %v", peer.ID))
+				numOfVotes++
+			}
+			r.Mu.Unlock()
+		}(peer)
 	}
 
 	r.Mu.Lock()
@@ -109,10 +129,12 @@ func (r *Raft) StartElection() {
 			r.VolatileState.LeaderVolatileState.NextIndex[peer.ID] = len(r.PersistentState.Logs) + 1
 			r.VolatileState.LeaderVolatileState.MatchIndex[peer.ID] = 0
 		}
+	} else {
+		r.State = FOLLOWER
 	}
 }
 
-func (r *Raft) VoteRequestReply(req RequestVote, resp *RequestVoteResp) error {
+func (r *Raft) VoteRequestReply(httpreq *http.Request, req *RequestVote, resp *RequestVoteResp) error {
 	r.Mu.Lock()
 	defer r.Mu.Unlock()
 
@@ -129,6 +151,8 @@ func (r *Raft) VoteRequestReply(req RequestVote, resp *RequestVoteResp) error {
 			r.Printf("Received vote request. Voting yes.")
 			resp.VoteGranted = true
 			r.PersistentState.VotedFor = req.CandidateID
+		} else {
+			r.Printf("Denying vote request, already voted")
 		}
 	}
 

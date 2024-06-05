@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/ybbus/jsonrpc/v3"
@@ -21,60 +22,61 @@ func (r *Raft) CreateAndSendAppendEntry() {
 	successCount := 0
 
 	for _, follower := range r.Peers {
+
 		if (follower.ID == r.ID) {
 			continue
 		}
 
-		r.Printf(fmt.Sprintf("Sending Append Entry to follower Node %v at port %v\n", follower.ID, follower.Address))
+		go func(follower *Peer) {
+			r.Printf(fmt.Sprintf("Sending Append Entry to follower Node %v at port %v\n", follower.ID, follower.Address))
 
-		r.Mu.Lock()
+			r.Mu.Lock()
 
-		appendEntry := AppendEntry{
-			Term: r.PersistentState.CurrentTerm,
-			LeaderID: r.ID,
-			PrevLogIndex: r.VolatileState.LeaderVolatileState.NextIndex[follower.ID],
-			PrevLogTerm: r.PersistentState.Logs[r.VolatileState.LeaderVolatileState.NextIndex[follower.ID] - 1].Term,
-			Entries: r.PersistentState.Logs[r.VolatileState.LeaderVolatileState.NextIndex[follower.ID]:],
-			LeaderCommitIndex: r.VolatileState.CommitIndex,
-			LeaderPort: r.Port,
-		}
+			appendEntry := AppendEntry{
+				Term: r.PersistentState.CurrentTerm,
+				LeaderID: r.ID,
+				PrevLogIndex: r.VolatileState.LeaderVolatileState.NextIndex[follower.ID],
+				PrevLogTerm: r.PersistentState.Logs[r.VolatileState.LeaderVolatileState.NextIndex[follower.ID] - 1].Term,
+				Entries: r.PersistentState.Logs[r.VolatileState.LeaderVolatileState.NextIndex[follower.ID]:],
+				LeaderCommitIndex: r.VolatileState.CommitIndex,
+				LeaderPort: r.Port,
+			}
 
-		r.Mu.Unlock()
+			r.Mu.Unlock()
 
-		rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://localhost:%v/rpc", follower.Address))
-		resp, err := rpcClient.Call(context.Background(), "Raft.AppendEntryFollower", appendEntry)
+			rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://localhost:%v/rpc", follower.Address))
+			resp, err := rpcClient.Call(context.Background(), "Raft.AppendEntryFollower", appendEntry)
 
-		if (err != nil) {
-			continue
-		}
-
-		var appendEntryResp AppendEntryResp
-		err = resp.GetObject(&appendEntryResp)
-
-		if err != nil {
-			continue
-		}
-
-		r.Mu.Lock()
-
-		if !appendEntryResp.Success {
-			if appendEntryResp.Term < r.PersistentState.CurrentTerm {
-				r.PersistentState.CurrentTerm = appendEntryResp.Term
-				r.State = FOLLOWER
-				r.Mu.Unlock()
+			if (err != nil) {
 				return
 			}
 
-			r.VolatileState.LeaderVolatileState.NextIndex[follower.ID]--
-		} else {
-			r.VolatileState.LeaderVolatileState.MatchIndex[follower.ID] = r.PersistentState.CurrentTerm
-			r.VolatileState.LeaderVolatileState.NextIndex[follower.ID] = len(r.PersistentState.Logs) - 1
-			successCount++
-		}
+			var appendEntryResp AppendEntryResp
+			err = resp.GetObject(&appendEntryResp)
 
-		r.Mu.Unlock()
+			if err != nil {
+				return
+			}
 
-		
+			r.Mu.Lock()
+
+			if !appendEntryResp.Success {
+				if appendEntryResp.Term < r.PersistentState.CurrentTerm {
+					r.PersistentState.CurrentTerm = appendEntryResp.Term
+					r.State = FOLLOWER
+					r.Mu.Unlock()
+					return
+				}
+
+				r.VolatileState.LeaderVolatileState.NextIndex[follower.ID]--
+			} else {
+				r.VolatileState.LeaderVolatileState.MatchIndex[follower.ID] = r.PersistentState.CurrentTerm
+				r.VolatileState.LeaderVolatileState.NextIndex[follower.ID] = len(r.PersistentState.Logs) - 1
+				successCount++
+			}
+
+			r.Mu.Unlock()
+		}(follower)
 	}
 
 	// at least half of the followers say they have added it to their logs
@@ -87,7 +89,7 @@ func (r *Raft) CreateAndSendAppendEntry() {
 /*
 Follower handling for appending entry RPC. Used in RPC Call.
 */
-func (r *Raft) AppendEntryFollower(req AppendEntry, resp *AppendEntryResp) error {
+func (r *Raft) AppendEntryFollower(httpreq *http.Request, req *AppendEntry, resp *AppendEntryResp) error {
 	r.Mu.Lock()
 	defer r.Mu.Unlock()
 
