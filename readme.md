@@ -1,6 +1,6 @@
 # Distributed Database
 
-An implementation of a key/value database in Golang. Uses the [Raft consensus algorithm](https://raft.github.io/) for server consensus.
+An implementation of a key/value database in Golang. Uses the [Raft consensus algorithm](https://raft.github.io/) for server consensus. This implementation is a proof of concept and may have bugs.
 
 ## How to start a node
 
