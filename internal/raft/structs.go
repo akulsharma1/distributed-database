@@ -60,7 +60,7 @@ type RequestVote struct {
 	Term int `json:"term"`
 	CandidateID int `json:"candidateID"`
 	LastLogIndex int `json:"lastLogIndex"` // index of last log candidate has
-	LastLogTerm int `josn:"lastLogTerm"` // term of last log candidate has
+	LastLogTerm int `json:"lastLogTerm"` // term of last log candidate has
 }
 
 type RequestVoteResp struct {
