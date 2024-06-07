@@ -2,7 +2,6 @@ package raft
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -142,7 +141,20 @@ func (r *Raft) VoteRequestReply(httpreq *http.Request, req *RequestVote, resp *R
 	if req.Term < r.PersistentState.CurrentTerm {
 		r.Printf("Received vote request. Voting no, invalid term.")
 		resp.VoteGranted = false
-		return errors.New("invalid term")
+		return nil
+	}
+
+	if len(r.PersistentState.Logs) == 0 {
+		if r.PersistentState.VotedFor == -1 {
+			r.Printf("Received vote request. Voting yes.")
+			resp.VoteGranted = true
+			r.PersistentState.VotedFor = req.CandidateID
+			return nil
+		} else {
+			r.Printf("Denying vote request, already voted")
+			resp.VoteGranted = false
+			return nil
+		}
 	}
 
 	if req.LastLogIndex >= len(r.PersistentState.Logs) - 1 && req.LastLogTerm >= r.PersistentState.Logs[len(r.PersistentState.Logs) - 1].Term {
@@ -154,8 +166,6 @@ func (r *Raft) VoteRequestReply(httpreq *http.Request, req *RequestVote, resp *R
 			r.Printf("Denying vote request, already voted")
 		}
 	}
-
-	r.Printf("Received vote request. Voting no.")
 
 	resp.VoteGranted = false
 	return nil
