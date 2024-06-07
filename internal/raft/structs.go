@@ -57,15 +57,15 @@ type Log struct {
 }
 
 type RequestVote struct {
-	Term int
-	CandidateID int
-	LastLogIndex int // index of last log candidate has
-	LastLogTerm int // term of last log candidate has
+	Term int `json:"term"`
+	CandidateID int `json:"candidateID"`
+	LastLogIndex int `json:"lastLogIndex"` // index of last log candidate has
+	LastLogTerm int `json:"lastLogTerm"` // term of last log candidate has
 }
 
 type RequestVoteResp struct {
-	Term int // term of peer for updating
-	VoteGranted bool // whether vote was granted from peer
+	Term int `json:"term"` // term of peer for updating
+	VoteGranted bool `json:"voteGranted"` // whether vote was granted from peer
 }
 
 type AppendEntry struct {

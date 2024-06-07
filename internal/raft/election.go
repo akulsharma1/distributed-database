@@ -75,11 +75,10 @@ func (r *Raft) StartElection() {
 
 			r.Mu.Unlock()
 
-			rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://%v/rpc", peer.Address))
-			resp, err := rpcClient.Call(context.Background(), "Raft.VoteRequestReply", &voteRequest)
+			vReq := []interface{}{voteRequest}
 
-			// log.Println("****VOTE REQUEST REPLY******")
-			// log.Println(resp, err)
+			rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://%v/rpc", peer.Address))
+			resp, err := rpcClient.Call(context.Background(), "Raft.VoteRequestReply", vReq)
 
 			if (err != nil) {
 				return

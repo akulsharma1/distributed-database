@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/rpc"
 	"sync"
 	"time"
+
+	"github.com/gorilla/mux"
+	rpc "github.com/gorilla/rpc"
+	gjson "github.com/gorilla/rpc/json"
 )
 
 /*
@@ -17,32 +19,28 @@ Also handles heartbeats, elections, etc.
 Blocker function, does not stop.
 */
 func (r *Raft) StartServer() {
+	router := mux.NewRouter()
+
+	router.HandleFunc("/get", r.HandleGet)
+	router.HandleFunc("/set", r.HandleSet)
+
 	rpcServer := rpc.NewServer()
+	rpcServer.RegisterCodec(gjson.NewCodec(), "application/json")
+	err := rpcServer.RegisterService(r, "")
 
-	err := rpcServer.Register(r)
 	if err != nil {
 		panic(err)
 	}
 
-	listener, err := net.Listen("tcp", r.Port)
-	if err != nil {
-		panic(err)
-	}
+	router.Handle("/rpc", rpcServer)
+	
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-	mux := http.NewServeMux()
-	mux.Handle(rpc.DefaultRPCPath, rpcServer)
-
-	mux.HandleFunc("/get", r.HandleGet)
-	mux.HandleFunc("/set", r.HandleSet)
+	go http.ListenAndServe(r.Port, router)
 
 	r.Printf(fmt.Sprintf("Starting server at %v", r.Port))
-	var wg sync.WaitGroup
-
-	r.Server = &http.Server{Handler: mux}
-
-	wg.Add(1)
-	go r.Server.Serve(listener)
-
+	
 	wg.Add(1)
 	// append entries for leader - function runs no matter what
 	// if not leader, it just returns and goroutine goes to next loop iteration

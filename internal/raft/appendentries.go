@@ -44,8 +44,9 @@ func (r *Raft) CreateAndSendAppendEntry() {
 
 			r.Mu.Unlock()
 
+			aReq := []interface{}{appendEntry}
 			rpcClient := jsonrpc.NewClient(fmt.Sprintf("http://localhost:%v/rpc", follower.Address))
-			resp, err := rpcClient.Call(context.Background(), "Raft.AppendEntryFollower", appendEntry)
+			resp, err := rpcClient.Call(context.Background(), "Raft.AppendEntryFollower", aReq)
 
 			if (err != nil) {
 				return
